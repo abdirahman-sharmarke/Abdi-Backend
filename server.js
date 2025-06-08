@@ -5,26 +5,16 @@ const sequelize = require('./src/config/db');
 
 const PORT = process.env.PORT || 5000;
 
-// Initialize database connection
-const initializeDatabase = async () => {
-  try {
-    await sequelize.authenticate();
+sequelize.authenticate()
+  .then(() => {
     console.log('✅ Connected to PostgreSQL');
-    await sequelize.sync({ force: false, alter: false });
-  } catch (err) {
+    return sequelize.sync({ force: false, alter: true });
+  })
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on http://localhost:${PORT}`);
+    });
+  })
+  .catch(err => {
     console.error('❌ Unable to connect to DB:', err);
-  }
-};
-
-// Initialize database
-initializeDatabase();
-
-// For Vercel deployment
-if (process.env.VERCEL) {
-  module.exports = app;
-} else {
-  // For local development
-  app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
   });
-}

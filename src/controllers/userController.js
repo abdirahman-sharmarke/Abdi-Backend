@@ -1,62 +1,16 @@
+const User = require('../models/user');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_here';
-
-// Lazy load the User model to avoid database connection issues
-let User;
-let sequelize;
-let isConnected = false;
-
-const getUser = async () => {
-  if (!User || !isConnected) {
-    try {
-      // Initialize sequelize if not already done
-      if (!sequelize) {
-        sequelize = require('../config/db');
-      }
-      
-      // Test database connection with retry
-      let retries = 3;
-      while (retries > 0 && !isConnected) {
-        try {
-          await sequelize.authenticate();
-          console.log('✅ Database connected successfully');
-          isConnected = true;
-          break;
-        } catch (error) {
-          retries--;
-          console.log(`Database connection attempt failed, retries left: ${retries}`);
-          if (retries === 0) throw error;
-          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
-        }
-      }
-      
-      // Load User model if not already loaded
-      if (!User) {
-        User = require('../models/user');
-        // Sync the model (create table if not exists)
-        await User.sync({ alter: false });
-      }
-      
-    } catch (error) {
-      console.error('Database connection error:', error);
-      isConnected = false;
-      throw new Error(`Database connection failed: ${error.message}`);
-    }
-  }
-  return User;
-};
 
 // Register new user
 const registerUser = async (req, res) => {
   const { fullName, email, avatar, password } = req.body;
   
   try {
-    const UserModel = await getUser();
-    
     // Check if user already exists
-    const existingUser = await UserModel.findOne({ where: { email } });
+    const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
       return res.status(400).json({ message: 'Email already in use' });
     }
@@ -65,7 +19,7 @@ const registerUser = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create user
-    const user = await UserModel.create({ 
+    const user = await User.create({ 
       fullName, 
       email, 
       avatar, 
@@ -82,7 +36,6 @@ const registerUser = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Register error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -92,10 +45,8 @@ const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const UserModel = await getUser();
-    
     // Find user
-    const user = await UserModel.findOne({ where: { email } });
+    const user = await User.findOne({ where: { email } });
     if (!user) {
       return res.status(400).json({ message: 'Invalid email or password' });
     }
@@ -112,7 +63,6 @@ const loginUser = async (req, res) => {
     res.json({ message: 'Login successful', token });
 
   } catch (error) {
-    console.error('Login error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -120,13 +70,11 @@ const loginUser = async (req, res) => {
 // Get all users
 const getAllUsers = async (req, res) => {
   try {
-    const UserModel = await getUser();
-    const users = await UserModel.findAll({
+    const users = await User.findAll({
       attributes: { exclude: ['password'] }
     });
     res.json(users);
   } catch (error) {
-    console.error('Get all users error:', error);
     res.status(500).json({ message: 'Failed to fetch users', error: error.message });
   }
 };
@@ -134,8 +82,7 @@ const getAllUsers = async (req, res) => {
 // Get user by ID
 const getUserById = async (req, res) => {
   try {
-    const UserModel = await getUser();
-    const user = await UserModel.findByPk(req.params.id, {
+    const user = await User.findByPk(req.params.id, {
       attributes: { exclude: ['password'] }
     });
     
@@ -145,7 +92,6 @@ const getUserById = async (req, res) => {
 
     res.json(user);
   } catch (error) {
-    console.error('Get user by ID error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -156,8 +102,7 @@ const updateUser = async (req, res) => {
   const { fullName, email, avatar, password } = req.body;
 
   try {
-    const UserModel = await getUser();
-    const user = await UserModel.findByPk(userId);
+    const user = await User.findByPk(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -171,7 +116,6 @@ const updateUser = async (req, res) => {
     res.json({ message: 'User updated successfully' });
 
   } catch (error) {
-    console.error('Update user error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -181,8 +125,7 @@ const deleteUser = async (req, res) => {
   const userId = req.userId;
 
   try {
-    const UserModel = await getUser();
-    const user = await UserModel.findByPk(userId);
+    const user = await User.findByPk(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -191,7 +134,6 @@ const deleteUser = async (req, res) => {
     res.json({ message: 'User deleted successfully' });
 
   } catch (error) {
-    console.error('Delete user error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
