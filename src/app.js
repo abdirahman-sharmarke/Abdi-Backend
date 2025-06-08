@@ -1,7 +1,21 @@
 const express = require('express');
 const userRoutes = require('./routes/user');
+const sequelize = require('./config/db');
 
 const app = express();
+
+// Initialize database connection for serverless
+const initDB = async () => {
+  try {
+    await sequelize.authenticate();
+    console.log('✅ Database connected');
+  } catch (error) {
+    console.error('❌ Database connection failed:', error);
+  }
+};
+
+// Initialize database
+initDB();
 
 app.use(express.json());
 
