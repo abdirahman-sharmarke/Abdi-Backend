@@ -5,16 +5,44 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_here';
 
 // Lazy load the User model to avoid database connection issues
 let User;
+let sequelize;
+let isConnected = false;
+
 const getUser = async () => {
-  if (!User) {
+  if (!User || !isConnected) {
     try {
-      User = require('../models/user');
-      // Test database connection
-      const sequelize = require('../config/db');
-      await sequelize.authenticate();
+      // Initialize sequelize if not already done
+      if (!sequelize) {
+        sequelize = require('../config/db');
+      }
+      
+      // Test database connection with retry
+      let retries = 3;
+      while (retries > 0 && !isConnected) {
+        try {
+          await sequelize.authenticate();
+          console.log('✅ Database connected successfully');
+          isConnected = true;
+          break;
+        } catch (error) {
+          retries--;
+          console.log(`Database connection attempt failed, retries left: ${retries}`);
+          if (retries === 0) throw error;
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+        }
+      }
+      
+      // Load User model if not already loaded
+      if (!User) {
+        User = require('../models/user');
+        // Sync the model (create table if not exists)
+        await User.sync({ alter: false });
+      }
+      
     } catch (error) {
       console.error('Database connection error:', error);
-      throw new Error('Database connection failed');
+      isConnected = false;
+      throw new Error(`Database connection failed: ${error.message}`);
     }
   }
   return User;
